@@ -1,5 +1,6 @@
 (ns bug
   (:require
+   [jsonista.core :as j]
    [org.httpkit.server :as server]
    [starfederation.datastar.clojure.api :as d*]
    [starfederation.datastar.clojure.adapter.http-kit :refer [->sse-response on-open on-close]]
@@ -9,14 +10,22 @@
 
 (def datastar-beta9 "https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-beta.9/bundles/datastar.js")
 (def datastar-develop "https://cdn.jsdelivr.net/gh/starfederation/datastar@develop/bundles/datastar.js")
+(def datastar-fix1 "https://cdn.jsdelivr.net/gh/starfederation/datastar@81caba5e681abf5e742bfaba9f4e8275094208c2/bundles/datastar.js")
 
-(defn page [datastar-src [version other-version] body]
-  (h/html
-   [[h/doctype-html5]
-    [:html
-     [:head
-      [:style {:type "text/css"}
-       "
+(defn select-src [v]
+  (condp = v
+    "beta9"   datastar-beta9
+    "81caba5" datastar-fix1
+    datastar-develop))
+
+(defn page [version body]
+  (let [datastar-src (select-src version)]
+    (h/html
+     [[h/doctype-html5]
+      [:html
+       [:head
+        [:style {:type "text/css"}
+         "
 #main {
     display: flex;
     justify-content: center;
@@ -37,13 +46,12 @@
     background: red;
 }
 "]
-      [:meta {:charset "UTF-8"}]
-      [:script {:type "module" :crossorigin "anonymous" :src datastar-src}]]
-     [:body
-      [:div {:data-on-load               "@post('/updates')"
-             :data-signals-other-version (str "'" other-version "'")
-             :data-signals-version       (str "'" version "'")}]
-      body]]]))
+        [:meta {:charset "UTF-8"}]
+        [:script {:type "module" :crossorigin "anonymous" :src datastar-src}]]
+       [:body
+        [:div {:data-on-load         "@post('/updates')"
+               :data-signals-version (j/write-value-as-string version)}]
+        body]]])))
 
 (defn bug-view [n]
   [:main {:id "main"}
@@ -54,7 +62,10 @@
      [:li "Click the Fetch button (it will turn red)"]
      [:li "Click the Re-Render button (the fetch button label will change)"]
      [:li "Press the Fetch button again (it will not turn red on d* develop, but it should)"]]
-    [:p {:style "font-size: 0.8rem;"} "datastar version: " [:span {:style "font-family: monospace; " :data-text "$version"}] [:br] [:a {:data-attr-href (format  "'/?version=' + $otherVersion")} "toggle version"]]]
+    [:p {:style "font-size: 0.8rem;"} "datastar version: " [:span {:style "font-family: monospace; " :data-text "$version"}] [:br]]
+    [:div {:style "display: flex; gap: 10px;"}
+     (map (fn [v]
+            [:a {:data-attr-href (format  "'/?version=%s'" v)} v]) ["beta9" "develop" "81caba5"])]]
 
    [:div {:style " display: flex; flex-direction: column; justify-content:center;align-items:center;"}
     [:div {:style "max-width: 12rem;"}
@@ -96,20 +107,16 @@
 (defn parse-version [qs]
   (let [v (when qs
             (second (str/split qs #"=")))]
-    (if (= v "beta9")
-      ;; [current other]
-      ["beta9" "develop"]
-      ["develop" "beta9"])))
+    (condp = v
+      "beta9"   "beta9"
+      "81caba5" "81caba5"
+      "develop")))
 
 (defn shim-handler [req]
-  (let [v   (parse-version (:query-string req))
-        src (if (= "beta9" (first v))
-              datastar-beta9
-              datastar-develop)]
-    {:status  200
-     :headers {"Content-Type" "text/html"}
-     :body    (page src v
-                    [:main {:id "main"} "Loading"])}))
+  {:status  200
+   :headers {"Content-Type" "text/html"}
+   :body    (page (parse-version (:query-string req))
+                  [:main {:id "main"} "Loading"])})
 
 (def routes
   [""
