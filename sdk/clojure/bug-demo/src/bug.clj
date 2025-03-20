@@ -38,7 +38,7 @@
 }
 "]
       [:meta {:charset "UTF-8"}]
-      [:script {:type "module" :src datastar-src}]]
+      [:script {:type "module" :crossorigin "anonymous" :src datastar-src}]]
      [:body
       [:div {:data-on-load               "@post('/updates')"
              :data-signals-other-version (str "'" other-version "'")
@@ -148,18 +148,21 @@
                                :legacy-return-value? false}))))
 
 (defn parse-port [args]
-  (try
-    (parse-long (first args))
-    (catch Exception _
-      3000)))
+  (if-let [ep (System/getenv "DS_PORT")]
+    (parse-long ep)
+    (try
+      (parse-long (first args))
+      (catch Exception _
+        3000))))
 
 (defn -main [& args]
-  (let [port (parse-port args)]
+  (let [port (parse-port args)
+        host (or (System/getenv "DS_HOST") "127.0.0.1")]
     (server/run-server handler
                        {:port                 port
-                        :ip                   "127.0.0.1"
+                        :ip                   host
                         :legacy-return-value? false})
-    (println "Server started. Go to" (str "http://127.0.0.1:" port))))
+    (println "Server started. Go to" (format "http://%s:%s" host port))))
 
 (comment
   ;; For REPL explorers
