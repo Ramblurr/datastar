@@ -6,16 +6,17 @@
    [starfederation.datastar.clojure.adapter.http-kit :refer [->sse-response on-open on-close]]
    [reitit.ring :as rr]
    [dev.onionpancakes.chassis.core :as h]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [jsonista.core :as json]))
 
 (def datastar-beta9 "https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-beta.9/bundles/datastar.js")
 (def datastar-develop "https://cdn.jsdelivr.net/gh/starfederation/datastar@develop/bundles/datastar.js")
-(def datastar-fix1 "https://cdn.jsdelivr.net/gh/starfederation/datastar@81caba5e681abf5e742bfaba9f4e8275094208c2/bundles/datastar.js")
+(def datastar-fix3 "https://cdn.jsdelivr.net/gh/starfederation/datastar@0f8ff150fafa9b2278cc15d796a10ddd604f89f1/bundles/datastar.js")
 
 (defn select-src [v]
   (condp = v
-    "beta9"   datastar-beta9
-    "81caba5" datastar-fix1
+    "beta9"    datastar-beta9
+    "0f8ff150" datastar-fix3
     datastar-develop))
 
 (defn page [version body]
@@ -65,7 +66,7 @@
     [:p {:style "font-size: 0.8rem;"} "datastar version: " [:span {:style "font-family: monospace; " :data-text "$version"}] [:br]]
     [:div {:style "display: flex; gap: 10px;"}
      (map (fn [v]
-            [:a {:data-attr-href (format  "'/?version=%s'" v)} v]) ["beta9" "develop" "81caba5"])]]
+            [:a {:data-attr-href (format  "'/?version=%s'" v)} v]) ["beta9" "develop" "0f8ff150"])]]
 
    [:div {:style " display: flex; flex-direction: column; justify-content:center;align-items:center;"}
     [:div {:style "max-width: 12rem;"}
@@ -76,10 +77,13 @@
       (str "Fetch" n)]
      [:p {:style "font-size: 0.8rem"} "Click the button to make a request which takes 3 seconds. The button will turn red while the request is in flight."]]
     [:div {:style "max-width: 12rem; margin-top: 4rem;"}
-     [:button {:id            :rerenderr-btn
+     [:button {:id            :rerender-btn
                :data-on-click "@post('/re-render')"}
       "Re-Render"]
-     [:p {:style "font-size: 0.8rem"} "Click this button to re-render the view with a small tweak."]]]])
+     [:p {:style "font-size: 0.8rem"} "Click this button to re-render the view with a small tweak."]]]
+   [:div
+    "Signals:"
+    [:pre {:data-text "ctx.signals.JSON()"}]]])
 
 (defonce !conns (atom #{}))
 
@@ -108,8 +112,10 @@
   (let [v (when qs
             (second (str/split qs #"=")))]
     (condp = v
-      "beta9"   "beta9"
-      "81caba5" "81caba5"
+      "beta9"    "beta9"
+      "81caba5"  "81caba5"
+      "0f8ff150" "0f8ff150"
+
       "develop")))
 
 (defn shim-handler [req]
